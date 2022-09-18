@@ -4,6 +4,13 @@ from pymongo import MongoClient
 import os
 import jwt
 
+def overlap_check(time, potential_new_appointment_time):
+    if potential_new_appointment_time[0] > time[0] and potential_new_appointment_time[1] < time[1]:
+      return True
+    else:
+      return False
+
+
 database_url = os.environ['DB_URL']
 database_name = os.environ['DB_NAME']
 
@@ -87,7 +94,78 @@ class Signup(Resource):
             return jsonify({"message": "User added succesfully"})
 
 class Schedule(Resource):
-  pass
+
+    def put(self):
+        token = request.json['token']
+        username = jwt.decode(token, "vader", algorithms=["HS256"])['username']
+
+        title = request.json['title']
+        agenda = request.json['agenda']
+        time = request.json['time']
+        guest = request.json['guest']
+
+        if username == guest:
+            return jsonify({"message": "Cannot be Scheduled"})
+
+        username_exist_check = collection.find_one({'username': username})
+        guest_exist_check = collection.find_one({'username': guest})
+
+        if username_exist_check and guest_exist_check:
+            host_appointments = username_exist_check['appointments']
+            guest_appointments = guest_exist_check['appointments']
+
+            host_available = True
+            guest_available = True
+
+            for appointment in host_appointments:
+                if overlap_check(appointment['time'], time):
+                    # host_appointments.append(Appointment(tile, agenda, time, guest))
+                    host_available = False
+
+            for appointment in guest_appointments:
+                if overlap_check(appointment['time'], time):
+                    guest_available = False
+
+            if host_available and guest_available:
+                host_appointments.append(
+                    {'title': title, 'agenda': agenda, 'time': time, 'guest': guest})
+                guest_appointments.append(
+                    {'title': title, 'agenda': agenda, 'time': time, 'guest': guest})
+
+            print(host_appointments)
+
+            host_query = {'username': username}
+            guest_query = {'username': guest}
+
+            update_host = {"$set": {'appointments': host_appointments}}
+            update_guest = {"$set": {'appointments': guest_appointments}}
+
+            print('Here')
+
+            collection.update_one(host_query, update_host)
+            collection.update_one(guest_query, update_guest)
+
+            return jsonify({'message': f'Appointment scheduled for {time}'})
+
+        else:
+            return jsonify({"message": "Something went wronng"})
+
+    def get(self):
+        token = request.json['token']
+        username = jwt.decode(token, "vader", algorithms=["HS256"])['username']
+        # print(username)
+
+        username_exist_check = collection.find_one({'username': username})
+
+        if username_exist_check:
+            if len(username_exist_check['appointments']) < 1:
+                return jsonify({"message": "No Appointments"})
+            else:
+                return jsonify(
+                    {"Appointments": username_exist_check['appointments']})
+        else:
+            return jsonify({"message": "Something went wrong"})
+
 
 class MarkOff(Resource):
   pass
