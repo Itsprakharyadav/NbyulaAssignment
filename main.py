@@ -168,10 +168,64 @@ class Schedule(Resource):
 
 
 class MarkOff(Resource):
-  pass
+
+    def put(self):
+        token = request.json['token']
+        username = jwt.decode(token, "vader", algorithms=["HS256"])['username']
+        time = request.json['time']
+
+        username_exist_check = collection.find_one({'username': username})
+        # print(username_exist_check)
+
+        if username_exist_check:
+            appointments = username_exist_check['appointments']
+
+            for appointment in appointments:
+                if appointment.overlap_check(time):
+                    return jsonify({'message': 'cannot be marked as off'})
+
+            appointments.append({'title': 'Off', 'agenda': 'off', 'time': time, 'guest': ''})
+            query = {'username': username}
+            update_appointments = {"$set": {'appointments': appointments}}
+            collection.update_one(query, update_appointments)
+
+            return jsonify({'message': f'Off Hours marked for {time}'})
+        else:
+            return jsonify({'message': 'Something went wrong'})
+
 
 class ChangeNameAndPassword(Resource):
-  pass
+
+    def put(self):
+        token = request.json['token']
+        username = jwt.decode(token, "vader", algorithms=["HS256"])['username']
+
+        username_exist_check = collection.find_one({'username': username})
+
+        new_username = request.json['new_username']
+        new_password = request.json['new_password']
+
+        # print(username_exist_check)
+
+        if username_exist_check:
+
+            if new_password:
+                query = {'username': username}
+                update_password = {"$set": {'password': new_password}}
+                collection.update_one(query, update_password)
+
+            elif new_username:
+                query = {'username': username}
+                update_username = {"$set": {'username': new_username}}
+                collection.update_one(query, update_username)
+
+            else:
+                return jsonify({'message': 'No Updates'})
+
+            return jsonify({'message': 'Credentials updated'})
+
+        else:
+            return jsonify({'message': 'Something went wrong'})
 
 api.add_resource(Landing, '/')
 api.add_resource(Signup, '/signup')
