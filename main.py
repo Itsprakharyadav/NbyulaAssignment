@@ -23,3 +23,20 @@ class Landing(Resource):
         # collection.insert_one(user)
         return jsonify({'Message': 'Landing Page'})
 
+lass Login(Resource):
+
+    def get(self):
+        email = request.json['email']
+        password = request.json['password']
+
+        email_exist_check = collection.find_one({'email': email})
+
+        if email_exist_check:
+            if email_exist_check['password'] == password:
+                token = jwt.encode({"username": email_exist_check['username']},
+                                   "vader",
+                                   algorithm="HS256")
+                return jsonify({"message": "Logged In", "token": token})
+        else:
+            return jsonify({"message": "Invalid email or password"})
+
